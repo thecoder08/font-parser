@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <arpa/inet.h>
 #include <string.h>
 #include <malloc.h>
 
@@ -25,6 +24,9 @@ typedef struct {
 } Glyph;
 
 int fontFile;
+
+unsigned short ntohs(unsigned short in);
+unsigned int ntohl(unsigned int in);
 
 unsigned short readOffsetSubtable() {
     unsigned int scalar;
@@ -172,6 +174,14 @@ void readGlyphTable(unsigned int offset, Glyph* glyphTable) {
     printf("\n");
 }
 
+short readLocationFormat(unsigned int offset) {
+    lseek(fontFile, offset + 46, SEEK_SET);
+    short locFormat;
+    read(fontFile, &locFormat, 2);
+    locFormat = ntohs(locFormat);
+    return locFormat;
+}
+
 int main() {
     fontFile = open("DroidSansMono.ttf", O_RDONLY);
     if (fontFile == -1) {
@@ -180,13 +190,32 @@ int main() {
     }
     
     Glyph glyphs[2];
+    unsigned short locations[2];
+    unsigned short numGlyphs;
+    short locFormat = -1;
 
     int numTables = readOffsetSubtable();
     for (int i = 0; i < numTables; i++) {
         lseek(fontFile, i*16+12, SEEK_SET);
         TableDirectoryEntry entry = readTableDirectoryEntry();
-        if (memcmp(entry.tag, "loca", 4) == 0) {
-            readLocationTable(entry.offset);
+        if (memcmp(entry.tag, "head", 4) == 0) {
+            short locFormat = readLocationFormat(entry.offset);
+            printf("Location table format: %d\n", locFormat);
+        }
+        else if (memcmp(entry.tag, "maxp", 4) == 0) {
+            //numGlyphs = readNumGlyphs(entry.offset);
+        }
+        else if (memcmp(entry.tag, "loca", 4) == 0) {
+            if (locFormat == 0) {
+                //readShortLocationTable(entry.offset, locations);
+            }
+            else if (locFormat = 1) {
+                //readLongLocationTable(entry.offset, locations);
+            }
+            else {
+                fprintf(stderr, "Something went wrong.\n");
+                return 1;
+            }
         }
         else if (memcmp(entry.tag, "glyf", 4) == 0) {
             readGlyphTable(entry.offset, glyphs);
