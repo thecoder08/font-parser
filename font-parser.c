@@ -185,7 +185,10 @@ int main() {
     for (int i = 0; i < numTables; i++) {
         lseek(fontFile, i*16+12, SEEK_SET);
         TableDirectoryEntry entry = readTableDirectoryEntry();
-        if (memcmp(entry.tag, "glyf", 4) == 0) {
+        if (memcmp(entry.tag, "loca", 4) == 0) {
+            readLocationTable(entry.offset);
+        }
+        else if (memcmp(entry.tag, "glyf", 4) == 0) {
             readGlyphTable(entry.offset, glyphs);
         }
     }
@@ -204,7 +207,7 @@ int main() {
             int startIndex = 1;
             for (int j = 0; j < glyphs[i].numContours; j++) {
                 for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k++) {
-                line(glyphs[i].xCoordinates[k-1]/5, glyphs[i].yCoordinates[k-1]/5, glyphs[i].xCoordinates[k]/5, glyphs[i].yCoordinates[k]/5, 0xffffffff);
+                    line(glyphs[i].xCoordinates[k-1]/5, glyphs[i].yCoordinates[k-1]/5, glyphs[i].xCoordinates[k]/5, glyphs[i].yCoordinates[k]/5, 0xffffffff);
                 }
                 line(glyphs[i].xCoordinates[startIndex-1]/5, glyphs[i].yCoordinates[startIndex-1]/5, glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/5, glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/5, 0xffffffff);
                 startIndex = glyphs[i].contourEndIndices[j] + 2;
