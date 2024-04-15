@@ -200,9 +200,14 @@ int main() {
         }
         rectangle(0, 0, 640, 480, 0x00000000);
         // draw glyphs
-        for (int i = 0; i < 1; i++) {
-            for (int j = 1; j < glyphs[i].numPoints; j++) {
-                line(glyphs[i].xCoordinates[j-1]/5, glyphs[i].yCoordinates[j-1]/5, glyphs[i].xCoordinates[j]/5, glyphs[i].yCoordinates[j]/5, 0xffffffff);
+        for (int i = 0; i < 2; i++) {
+            int startIndex = 1;
+            for (int j = 0; j < glyphs[i].numContours; j++) {
+                for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k++) {
+                line(glyphs[i].xCoordinates[k-1]/5, glyphs[i].yCoordinates[k-1]/5, glyphs[i].xCoordinates[k]/5, glyphs[i].yCoordinates[k]/5, 0xffffffff);
+                }
+                line(glyphs[i].xCoordinates[startIndex-1]/5, glyphs[i].yCoordinates[startIndex-1]/5, glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/5, glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/5, 0xffffffff);
+                startIndex = glyphs[i].contourEndIndices[j] + 2;
             }
         }
         updateWindow();
