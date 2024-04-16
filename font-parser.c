@@ -23,10 +23,21 @@ typedef struct {
     unsigned char* pointFlags;
 } Glyph;
 
+typedef struct {
+    int x;
+    int y;
+} Point;
+
 int fontFile;
+int numTables;
+TableDirectoryEntry* tableDirectory;
+Glyph* glyphs;
+unsigned short* locations;
+unsigned short numGlyphs;
 
 unsigned short ntohs(unsigned short in);
 unsigned int ntohl(unsigned int in);
+void drawBezier(Point a, Point b, Point c, int color);
 
 unsigned short readOffsetSubtable() {
     unsigned int scalar;
@@ -56,11 +67,31 @@ TableDirectoryEntry readTableDirectoryEntry() {
     return entry;
 }
 
-Glyph readGlyph() {
+TableDirectoryEntry getTable(char* tag) {
+    for (int i = 0; i < numTables; i++) {
+        if (memcmp(tableDirectory[i].tag, tag, 4) == 0) {
+            return tableDirectory[i];
+        }
+    }
+}
+
+unsigned short readNumGlyphs(unsigned int offset) {
+    lseek(fontFile, offset + 4, SEEK_SET);
+    unsigned short numGlyph;
+    read(fontFile, &numGlyph, 2);
+    numGlyph = ntohs(numGlyph);
+    return numGlyph;
+}
+
+Glyph readGlyph(unsigned int offset) {
+    lseek(fontFile, offset, SEEK_SET);
     Glyph glyph;
     read(fontFile, &glyph.numContours, 2);
     glyph.numContours = ntohs(glyph.numContours);
     printf("Number of contours: %d\n", glyph.numContours);
+    if (glyph.numContours < 0) {
+        return glyphs[0];
+    }
     short xMin;
     read(fontFile, &xMin, 2);
     xMin = ntohs(xMin);
@@ -165,21 +196,43 @@ Glyph readGlyph() {
     return glyph;
 }
 
-void readGlyphTable(unsigned int offset, Glyph* glyphTable) {
+void readGlyphTable(unsigned int offset) {
     printf("\n");
     lseek(fontFile, offset, SEEK_SET);
-    for (int i = 0; i < 2; i++) {
-        glyphTable[i] = readGlyph();
+    for (int i = 0; i < numGlyphs; i++) {
+        printf("glyph #%d/%d:\n", i+1, numGlyphs);
+        glyphs[i] = readGlyph(offset + locations[i]);
     }
     printf("\n");
 }
 
 short readLocationFormat(unsigned int offset) {
-    lseek(fontFile, offset + 46, SEEK_SET);
+    lseek(fontFile, offset + 50, SEEK_SET);
     short locFormat;
     read(fontFile, &locFormat, 2);
     locFormat = ntohs(locFormat);
     return locFormat;
+}
+
+void readShortLocationTable(unsigned int offset) {
+    lseek(fontFile, offset, SEEK_SET);
+    for (int i = 0; i < numGlyphs + 1; i++) {
+        unsigned short glyphOffset;
+        read(fontFile, &glyphOffset, 2);
+        glyphOffset = ntohs(glyphOffset);
+        locations[i] = glyphOffset * 2;
+        printf("%d: %d\n", i, locations[i]);
+    }
+}
+
+void readLongLocationTable(unsigned int offset) {
+    lseek(fontFile, offset, SEEK_SET);
+    for (int i = 0; i < numGlyphs + 1; i++) {
+        unsigned int glyphOffset;
+        read(fontFile, &glyphOffset, 4);
+        glyphOffset = ntohl(glyphOffset);
+        locations[i] = glyphOffset;
+    }
 }
 
 int main() {
@@ -189,57 +242,91 @@ int main() {
         return 1;
     }
     
-    Glyph glyphs[2];
-    unsigned short locations[2];
-    unsigned short numGlyphs;
-    short locFormat = -1;
-
-    int numTables = readOffsetSubtable();
+    numTables = readOffsetSubtable();
+    tableDirectory = malloc(numTables * sizeof(TableDirectoryEntry));
     for (int i = 0; i < numTables; i++) {
-        lseek(fontFile, i*16+12, SEEK_SET);
-        TableDirectoryEntry entry = readTableDirectoryEntry();
-        if (memcmp(entry.tag, "head", 4) == 0) {
-            short locFormat = readLocationFormat(entry.offset);
-            printf("Location table format: %d\n", locFormat);
-        }
-        else if (memcmp(entry.tag, "maxp", 4) == 0) {
-            //numGlyphs = readNumGlyphs(entry.offset);
-        }
-        else if (memcmp(entry.tag, "loca", 4) == 0) {
-            if (locFormat == 0) {
-                //readShortLocationTable(entry.offset, locations);
-            }
-            else if (locFormat = 1) {
-                //readLongLocationTable(entry.offset, locations);
-            }
-            else {
-                fprintf(stderr, "Something went wrong.\n");
-                return 1;
-            }
-        }
-        else if (memcmp(entry.tag, "glyf", 4) == 0) {
-            readGlyphTable(entry.offset, glyphs);
-        }
+        tableDirectory[i] = readTableDirectoryEntry();
     }
 
+    short locFormat = readLocationFormat(getTable("head").offset);
+    printf("Location table format: %d\n", locFormat);
+    numGlyphs = readNumGlyphs(getTable("maxp").offset);
+    numGlyphs = 100;
+    glyphs = malloc(numGlyphs * sizeof(Glyph));
+    locations = malloc(numGlyphs * sizeof(unsigned int));
+
+    if (locFormat == 0) {
+        readShortLocationTable(getTable("loca").offset);
+    }
+    else {
+        readLongLocationTable(getTable("loca").offset);
+    }
+
+    readGlyphTable(getTable("glyf").offset);
+
     initWindow(640, 480, "Font Renderer");
+
+    int leftDown = 0;
+    int rightDown = 0;
+    int move = 250;
+    int xPos = -8500;
+    int yPos = 350;
+    int scale = 5;
+
     while (1) {
         Event event;
         while(checkWindowEvent(&event)) {
             if (event.type == WINDOW_CLOSE) {
                 return 0;
             }
+            if (event.type == KEY_CHANGE) {
+                if (event.keychange.key == 105) {
+                    leftDown = event.keychange.state;
+                }
+                if (event.keychange.key == 106) {
+                    rightDown = event.keychange.state;
+                }
+            }
+        }
+        if (leftDown) {
+            xPos -= 10;
+        }
+        if (rightDown) {
+            xPos += 10;
         }
         rectangle(0, 0, 640, 480, 0x00000000);
         // draw glyphs
-        for (int i = 0; i < 2; i++) {
-            int startIndex = 1;
+        for (int i = 0; i < numGlyphs; i++) {
+            int startIndex = 0;
             for (int j = 0; j < glyphs[i].numContours; j++) {
-                for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k++) {
-                    line(glyphs[i].xCoordinates[k-1]/5, glyphs[i].yCoordinates[k-1]/5, glyphs[i].xCoordinates[k]/5, glyphs[i].yCoordinates[k]/5, 0xffffffff);
+                for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
+                    Point a;
+                    a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
+                    a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
+                    Point b;
+                    b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
+                    b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
+                    line(a.x, a.y, b.x, b.y, 0x0000ff00);
                 }
-                line(glyphs[i].xCoordinates[startIndex-1]/5, glyphs[i].yCoordinates[startIndex-1]/5, glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/5, glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/5, 0xffffffff);
-                startIndex = glyphs[i].contourEndIndices[j] + 2;
+                Point a;
+                a.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/scale + (move*i) + xPos;
+                a.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/scale + yPos;
+                Point b;
+                b.x = glyphs[i].xCoordinates[startIndex]/scale + (move*i) + xPos;
+                b.y = -glyphs[i].yCoordinates[startIndex]/scale + yPos;
+                line(a.x, a.y, b.x, b.y, 0x0000ff00);
+                for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k += 2) {
+                    if ((glyphs[i].pointFlags[k] & 0x01) && (glyphs[i].pointFlags[k+1] & 0x01)) {
+                        Point a;
+                        a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
+                        a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
+                        Point b;
+                        b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
+                        b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
+                        line(a.x, a.y, b.x, b.y, 0xffffffff);
+                    }
+                }
+                startIndex = glyphs[i].contourEndIndices[j] + 1;
             }
         }
         updateWindow();
