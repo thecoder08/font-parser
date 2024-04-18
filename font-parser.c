@@ -38,6 +38,7 @@ unsigned short numGlyphs;
 unsigned short ntohs(unsigned short in);
 unsigned int ntohl(unsigned int in);
 void drawBezier(Point a, Point b, Point c, int color);
+void drawBezier2(Point a, Point b, Point c, Point d, int color);
 
 unsigned short readOffsetSubtable() {
     unsigned int scalar;
@@ -267,7 +268,7 @@ int main() {
 
     initWindow(640, 480, "Font Renderer");
 
-    int leftDown = 0;
+    int leftDown = 1;
     int rightDown = 0;
     int move = 250;
     int xPos = -8500;
@@ -297,7 +298,7 @@ int main() {
         }
         rectangle(0, 0, 640, 480, 0x00000000);
         // draw glyphs
-        for (int i = 0; i < 39; i++) {
+        for (int i = 30; i < 49; i++) {
             int startIndex = 0;
             for (int j = 0; j < glyphs[i].numContours; j++) {
                 /*for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
@@ -339,6 +340,13 @@ int main() {
                                 drawBezier(a, b, c, 0xffffffff);
                                 k++;
                             }
+                            else {
+                                Point d;
+                    d.x = glyphs[i].xCoordinates[k+3]/scale + (move*i) + xPos;
+                    d.y = -glyphs[i].yCoordinates[k+3]/scale + yPos;
+                                drawBezier2(a, b, c, d, 0xffffffff);
+                                k += 2;
+                            }
                         }
                     }
                 }
@@ -350,6 +358,7 @@ int main() {
                     Point c;
                 c.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j] - 1]/scale + (move*i) + xPos;
                 c.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j] - 1]/scale + yPos;
+                    
                     drawBezier(c, a, b, 0xffffffff);
                 }
                 startIndex = glyphs[i].contourEndIndices[j] + 1;

@@ -23,3 +23,11 @@ void drawBezier(Point a, Point b, Point c, int color) {
         line(start.x, start.y, end.x, end.y, color);
     }
 }
+
+void drawBezier2(Point a, Point b, Point c, Point d, int color) {
+    Point midpoint;
+    midpoint.x = (b.x + c.x) / 2;
+    midpoint.y = (b.y + c.y) / 2;
+    drawBezier(a, b, midpoint, color);
+    drawBezier(midpoint, c, d, color);
+}
