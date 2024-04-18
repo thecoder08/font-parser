@@ -73,6 +73,7 @@ TableDirectoryEntry getTable(char* tag) {
             return tableDirectory[i];
         }
     }
+    return tableDirectory[0]; // table non-existant
 }
 
 unsigned short readNumGlyphs(unsigned int offset) {
@@ -289,17 +290,17 @@ int main() {
             }
         }
         if (leftDown) {
-            xPos -= 10;
+            xPos -= 1;
         }
         if (rightDown) {
             xPos += 10;
         }
         rectangle(0, 0, 640, 480, 0x00000000);
         // draw glyphs
-        for (int i = 0; i < numGlyphs; i++) {
+        for (int i = 0; i < 39; i++) {
             int startIndex = 0;
             for (int j = 0; j < glyphs[i].numContours; j++) {
-                for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
+                /*for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
                     Point a;
                     a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
                     a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
@@ -307,24 +308,49 @@ int main() {
                     b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
                     b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
                     line(a.x, a.y, b.x, b.y, 0x0000ff00);
-                }
+                }*/
+                
                 Point a;
                 a.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/scale + (move*i) + xPos;
                 a.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/scale + yPos;
                 Point b;
                 b.x = glyphs[i].xCoordinates[startIndex]/scale + (move*i) + xPos;
                 b.y = -glyphs[i].yCoordinates[startIndex]/scale + yPos;
-                line(a.x, a.y, b.x, b.y, 0x0000ff00);
-                for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k += 2) {
-                    if ((glyphs[i].pointFlags[k] & 0x01) && (glyphs[i].pointFlags[k+1] & 0x01)) {
-                        Point a;
-                        a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
-                        a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
-                        Point b;
-                        b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
-                        b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
-                        line(a.x, a.y, b.x, b.y, 0xffffffff);
+                //line(a.x, a.y, b.x, b.y, 0x0000ff00);
+                
+                for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
+                    Point a;
+                    a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
+                    a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
+                    Point b;
+                    b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
+                    b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
+                    Point c;
+                    c.x = glyphs[i].xCoordinates[k+2]/scale + (move*i) + xPos;
+                    c.y = -glyphs[i].yCoordinates[k+2]/scale + yPos;
+                    if (glyphs[i].pointFlags[k] & 0x01) {
+                        if (glyphs[i].pointFlags[k+1] & 0x01) {
+                            // straight line
+                            line(a.x, a.y, b.x, b.y, 0xffffffff);
+                        }
+                        else {
+                            // we have a control point and therefore a bezier
+                            if (glyphs[i].pointFlags[k+2] & 0x01) {
+                                drawBezier(a, b, c, 0xffffffff);
+                                k++;
+                            }
+                        }
                     }
+                }
+                if (glyphs[i].pointFlags[glyphs[i].contourEndIndices[j]] & 0x01) {
+                    
+                    line(a.x, a.y, b.x, b.y, 0xffffffff);
+                }
+                else {
+                    Point c;
+                c.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j] - 1]/scale + (move*i) + xPos;
+                c.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j] - 1]/scale + yPos;
+                    drawBezier(c, a, b, 0xffffffff);
                 }
                 startIndex = glyphs[i].contourEndIndices[j] + 1;
             }
