@@ -237,8 +237,18 @@ void readLongLocationTable(unsigned int offset) {
     }
 }
 
+// this was the key to everything!!
+int findWrappedK(int k, int offset, int startIndex, int endIndex) {
+    int wrappedK = k + offset;
+    if (wrappedK > endIndex) {
+        int difference = wrappedK - endIndex;
+        wrappedK = startIndex + difference - 1;
+    }
+    return wrappedK;
+}
+
 int main() {
-    fontFile = open("DroidSansMono.ttf", O_RDONLY);
+    fontFile = open("Ubuntu-C.ttf", O_RDONLY);
     if (fontFile == -1) {
         fprintf(stderr, "Error opening font file!\n");
         return 1;
@@ -253,7 +263,7 @@ int main() {
     short locFormat = readLocationFormat(getTable("head").offset);
     printf("Location table format: %d\n", locFormat);
     numGlyphs = readNumGlyphs(getTable("maxp").offset);
-    numGlyphs = 100;
+    numGlyphs = 300;
     glyphs = malloc(numGlyphs * sizeof(Glyph));
     locations = malloc(numGlyphs * sizeof(unsigned int));
 
@@ -268,10 +278,10 @@ int main() {
 
     initWindow(640, 480, "Font Renderer");
 
-    int leftDown = 1;
+    int leftDown = 0;
     int rightDown = 0;
     int move = 250;
-    int xPos = -8500;
+    int xPos = 0;
     int yPos = 350;
     int scale = 5;
 
@@ -291,34 +301,16 @@ int main() {
             }
         }
         if (leftDown) {
-            xPos -= 1;
+            xPos -= 20;
         }
         if (rightDown) {
-            xPos += 10;
+            xPos += 20;
         }
         rectangle(0, 0, 640, 480, 0x00000000);
         // draw glyphs
-        for (int i = 30; i < 49; i++) {
+        for (int i = 0; i < numGlyphs; i++) {
             int startIndex = 0;
             for (int j = 0; j < glyphs[i].numContours; j++) {
-                /*for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
-                    Point a;
-                    a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
-                    a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
-                    Point b;
-                    b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
-                    b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
-                    line(a.x, a.y, b.x, b.y, 0x0000ff00);
-                }*/
-                
-                Point a;
-                a.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/scale + (move*i) + xPos;
-                a.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/scale + yPos;
-                Point b;
-                b.x = glyphs[i].xCoordinates[startIndex]/scale + (move*i) + xPos;
-                b.y = -glyphs[i].yCoordinates[startIndex]/scale + yPos;
-                //line(a.x, a.y, b.x, b.y, 0x0000ff00);
-                
                 for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
                     Point a;
                     a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
@@ -326,40 +318,47 @@ int main() {
                     Point b;
                     b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
                     b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
-                    Point c;
-                    c.x = glyphs[i].xCoordinates[k+2]/scale + (move*i) + xPos;
-                    c.y = -glyphs[i].yCoordinates[k+2]/scale + yPos;
-                    if (glyphs[i].pointFlags[k] & 0x01) {
-                        if (glyphs[i].pointFlags[k+1] & 0x01) {
+                    line(a.x, a.y, b.x, b.y, 0x0000ff00);
+                }
+                Point a;
+                a.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/scale + (move*i) + xPos;
+                a.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/scale + yPos;
+                Point b;
+                b.x = glyphs[i].xCoordinates[startIndex]/scale + (move*i) + xPos;
+                b.y = -glyphs[i].yCoordinates[startIndex]/scale + yPos;
+                line(a.x, a.y, b.x, b.y, 0x0000ff00);
+                
+                for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k++) {
+                    if (glyphs[i].pointFlags[findWrappedK(k, 0, startIndex, glyphs[i].contourEndIndices[j])] & 0x01) {
+                        Point a;
+                        a.x = glyphs[i].xCoordinates[findWrappedK(k, 0, startIndex, glyphs[i].contourEndIndices[j])]/scale + (move*i) + xPos;
+                        a.y = -glyphs[i].yCoordinates[findWrappedK(k, 0, startIndex, glyphs[i].contourEndIndices[j])]/scale + yPos;
+                        Point b;
+                        b.x = glyphs[i].xCoordinates[findWrappedK(k, 1, startIndex, glyphs[i].contourEndIndices[j])]/scale + (move*i) + xPos;
+                        b.y = -glyphs[i].yCoordinates[findWrappedK(k, 1, startIndex, glyphs[i].contourEndIndices[j])]/scale + yPos;
+                        if (glyphs[i].pointFlags[findWrappedK(k, 1, startIndex, glyphs[i].contourEndIndices[j])] & 0x01) {
                             // straight line
                             line(a.x, a.y, b.x, b.y, 0xffffffff);
                         }
                         else {
-                            // we have a control point and therefore a bezier
-                            if (glyphs[i].pointFlags[k+2] & 0x01) {
+                            Point c;
+                            c.x = glyphs[i].xCoordinates[findWrappedK(k, 2, startIndex, glyphs[i].contourEndIndices[j])]/scale + (move*i) + xPos;
+                            c.y = -glyphs[i].yCoordinates[findWrappedK(k, 2, startIndex, glyphs[i].contourEndIndices[j])]/scale + yPos;
+                            if (glyphs[i].pointFlags[findWrappedK(k, 2, startIndex, glyphs[i].contourEndIndices[j])] & 0x01) {
+                                // 1 control point bezier
                                 drawBezier(a, b, c, 0xffffffff);
                                 k++;
                             }
                             else {
                                 Point d;
-                    d.x = glyphs[i].xCoordinates[k+3]/scale + (move*i) + xPos;
-                    d.y = -glyphs[i].yCoordinates[k+3]/scale + yPos;
+                                d.x = glyphs[i].xCoordinates[findWrappedK(k, 3, startIndex, glyphs[i].contourEndIndices[j])]/scale + (move*i) + xPos;
+                                d.y = -glyphs[i].yCoordinates[findWrappedK(k, 3, startIndex, glyphs[i].contourEndIndices[j])]/scale + yPos;
+                                // 2 control point bezier
                                 drawBezier2(a, b, c, d, 0xffffffff);
                                 k += 2;
                             }
                         }
                     }
-                }
-                if (glyphs[i].pointFlags[glyphs[i].contourEndIndices[j]] & 0x01) {
-                    
-                    line(a.x, a.y, b.x, b.y, 0xffffffff);
-                }
-                else {
-                    Point c;
-                c.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j] - 1]/scale + (move*i) + xPos;
-                c.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j] - 1]/scale + yPos;
-                    
-                    drawBezier(c, a, b, 0xffffffff);
                 }
                 startIndex = glyphs[i].contourEndIndices[j] + 1;
             }
