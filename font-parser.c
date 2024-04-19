@@ -248,7 +248,7 @@ int findWrappedK(int k, int offset, int startIndex, int endIndex) {
 }
 
 int main() {
-    fontFile = open("Ubuntu-C.ttf", O_RDONLY);
+    fontFile = open("DroidSansMono.ttf", O_RDONLY);
     if (fontFile == -1) {
         fprintf(stderr, "Error opening font file!\n");
         return 1;
@@ -280,6 +280,7 @@ int main() {
 
     int leftDown = 0;
     int rightDown = 0;
+    int showHiddenContours = 0;
     int move = 250;
     int xPos = 0;
     int yPos = 350;
@@ -298,6 +299,9 @@ int main() {
                 if (event.keychange.key == 106) {
                     rightDown = event.keychange.state;
                 }
+                if (event.keychange.key == 46 && event.keychange.state == 1) {
+                    showHiddenContours = (showHiddenContours+1) % 2;
+                }
             }
         }
         if (leftDown) {
@@ -311,22 +315,24 @@ int main() {
         for (int i = 0; i < numGlyphs; i++) {
             int startIndex = 0;
             for (int j = 0; j < glyphs[i].numContours; j++) {
-                for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
+                if (showHiddenContours) {
+                    for (int k = startIndex; k < glyphs[i].contourEndIndices[j]; k++) {
+                        Point a;
+                        a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
+                        a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
+                        Point b;
+                        b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
+                        b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
+                        line(a.x, a.y, b.x, b.y, 0x0000ff00);
+                    }
                     Point a;
-                    a.x = glyphs[i].xCoordinates[k]/scale + (move*i) + xPos;
-                    a.y = -glyphs[i].yCoordinates[k]/scale + yPos;
+                    a.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/scale + (move*i) + xPos;
+                    a.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/scale + yPos;
                     Point b;
-                    b.x = glyphs[i].xCoordinates[k+1]/scale + (move*i) + xPos;
-                    b.y = -glyphs[i].yCoordinates[k+1]/scale + yPos;
+                    b.x = glyphs[i].xCoordinates[startIndex]/scale + (move*i) + xPos;
+                    b.y = -glyphs[i].yCoordinates[startIndex]/scale + yPos;
                     line(a.x, a.y, b.x, b.y, 0x0000ff00);
                 }
-                Point a;
-                a.x = glyphs[i].xCoordinates[glyphs[i].contourEndIndices[j]]/scale + (move*i) + xPos;
-                a.y = -glyphs[i].yCoordinates[glyphs[i].contourEndIndices[j]]/scale + yPos;
-                Point b;
-                b.x = glyphs[i].xCoordinates[startIndex]/scale + (move*i) + xPos;
-                b.y = -glyphs[i].yCoordinates[startIndex]/scale + yPos;
-                line(a.x, a.y, b.x, b.y, 0x0000ff00);
                 
                 for (int k = startIndex; k <= glyphs[i].contourEndIndices[j]; k++) {
                     if (glyphs[i].pointFlags[findWrappedK(k, 0, startIndex, glyphs[i].contourEndIndices[j])] & 0x01) {
